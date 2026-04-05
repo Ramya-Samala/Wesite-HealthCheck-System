@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 )
 
@@ -56,4 +57,41 @@ func (s *Store) save() error {
 		return err
 	}
 	return os.WriteFile(savePath, raw, 0644)
+}
+
+// All returns a sorted copy of all checks — sorted by endpoint alphabetically
+func (s *Store) All() []HealthCheck {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	out := make([]HealthCheck, 0, len(s.checks))
+	for _, c := range s.checks {
+		out = append(out, *c)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Endpoint < out[j].Endpoint
+	})
+	return out
+}
+
+func (s *Store) Find(id string) (HealthCheck, bool) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	c, ok := s.checks[id]
+	if !ok {
+		return HealthCheck{}, false
+	}
+	return *c, true
+}
+
+// HasEndpoint checks if a URL is already being monitored
+func (s *Store) HasEndpoint(ep string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	for _, c := range s.checks {
+		if c.Endpoint == ep {
+			return true
+		}
+	}
+	return false
 }
