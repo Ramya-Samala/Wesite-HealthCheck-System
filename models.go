@@ -9,3 +9,21 @@ type HealthCheck struct {
 	Duration string `json:"duration,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
+
+// PagedResponse with pagination info
+type PagedResponse struct {
+	Items []HealthCheck `json:"items"`
+	Page  int           `json:"page"`
+	Total int           `json:"total"`
+	Size  int           `json:"size"`
+}
+
+// ErrBody is what we send back when something goes wrong
+type ErrBody struct {
+	Message string `json:"message"`
+}
+
+// CreateReq is the expected body when creating a new check
+type CreateReq struct {
+	Endpoint string `json:"endpoint"`
+}
