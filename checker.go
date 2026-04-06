@@ -19,9 +19,13 @@ func RunCheck(hc *HealthCheck, timeout time.Duration) {
 	if err != nil {
 		hc.Status = "Error"
 		hc.Code = 0
+		hc.Error = err.Error()
 		return
 	}
+
+	// close the body even if we don't read it, otherwise connections leak
 	resp.Body.Close()
 	hc.Status = http.StatusText(resp.StatusCode)
 	hc.Code = int32(resp.StatusCode)
+	hc.Error = "" // clear any previous error
 }
