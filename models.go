@@ -1,16 +1,17 @@
 package main
 
+// HealthCheck holds all the info about a single monitored endpoint
 type HealthCheck struct {
 	ID       string `json:"id"`
-	Endpoint string `json:"endpoint"`
 	Status   string `json:"status,omitempty"`
 	Code     *int32 `json:"code,omitempty"` // pointer so we can distinguish 0 from "not checked yet"
+	Endpoint string `json:"endpoint"`
 	Checked  int64  `json:"checked,omitempty"`
 	Duration string `json:"duration,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
 
-// PagedResponse with pagination info
+// PagedResponse wraps a list of checks with pagination info
 type PagedResponse struct {
 	Items []HealthCheck `json:"items"`
 	Page  int           `json:"page"`
