@@ -29,3 +29,24 @@ func RunCheck(hc *HealthCheck, timeout time.Duration) {
 	hc.Code = int32(resp.StatusCode)
 	hc.Error = "" // clear any previous error
 }
+
+// RunAll fires off every check at the same time and waits for all to finish
+func RunAll(db *Store, timeout time.Duration) {
+	checks := db.All()
+	if len(checks) == 0 {
+		return
+	}
+
+	ch := make(chan HealthCheck, len(checks))
+	for _, c := range checks {
+		go func(hc HealthCheck) {
+			RunCheck(&hc, timeout)
+			ch <- hc
+		}(c)
+	}
+
+	for i := 0; i < len(checks); i++ {
+		done := <-ch
+		db.Update(&done)
+	}
+}
