@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const perPage = 10
@@ -110,4 +111,92 @@ func doCreate(db *Store, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, 201, hc)
+}
+
+func doTry(db *Store, w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		errResp(w, 405, "method not allowed")
+		return
+	}
+
+	hc, ok := db.Find(id)
+	if !ok {
+		errResp(w, 404, "health check not found")
+		return
+	}
+
+	// default timeout is 10s but caller can override via query string
+	tout := 10 * time.Second
+	if raw := r.URL.Query().Get("timeout"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			errResp(w, 400, "invalid timeout value")
+			return
+		}
+		tout = d
+	}
+
+	RunCheck(&hc, tout)
+	if err := db.Update(&hc); err != nil {
+		errResp(w, 500, "failed saving check result")
+		return
+	}
+	jsonResp(w, 200, hc)
+}
+
+func doDelete(db *Store, w http.ResponseWriter, id string) {
+	if err := db.Remove(id); err != nil {
+		errResp(w, 404, "health check not found")
+		return
+	}
+	w.WriteHeader(204)
+}
+
+// HealthHandler handles all /api/health/checks routes and figures out
+// what to do based on the URL path and HTTP method
+func HealthHandler(db *Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// trim the base path to get whatever comes after /api/health/checks
+		tail := strings.TrimPrefix(r.URL.Path, "/api/health/checks")
+		tail = strings.TrimRight(tail, "/")
+
+		if tail == "" {
+			routeCollection(db, w, r)
+			return
+		}
+
+		if strings.HasSuffix(tail, "/try") {
+			id := strings.TrimSuffix(strings.TrimPrefix(tail, "/"), "/try")
+			doTry(db, w, r, id)
+			return
+		}
+
+		id := strings.TrimPrefix(tail, "/")
+		if strings.Contains(id, "/") {
+			errResp(w, 404, "not found")
+			return
+		}
+		routeSingle(db, w, r, id)
+	}
+}
+
+func routeCollection(db *Store, w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		doList(db, w, r)
+	} else if r.Method == http.MethodPost {
+		doCreate(db, w, r)
+	} else {
+		errResp(w, 405, "method not allowed")
+	}
+}
+
+func routeSingle(db *Store, w http.ResponseWriter, r *http.Request, id string) {
+	switch r.Method {
+	case http.MethodGet:
+		doGet(db, w, id)
+	case http.MethodDelete:
+		doDelete(db, w, id)
+	default:
+		errResp(w, 405, "method not allowed")
+	}
 }
