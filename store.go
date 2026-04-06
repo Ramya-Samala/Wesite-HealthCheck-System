@@ -95,3 +95,30 @@ func (s *Store) HasEndpoint(ep string) bool {
 	}
 	return false
 }
+
+func (s *Store) Put(hc *HealthCheck) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.checks[hc.ID] = hc
+	return s.save()
+}
+
+func (s *Store) Update(hc *HealthCheck) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if _, ok := s.checks[hc.ID]; !ok {
+		return fmt.Errorf("check %s does not exist", hc.ID)
+	}
+	s.checks[hc.ID] = hc
+	return s.save()
+}
+
+func (s *Store) Remove(id string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if _, ok := s.checks[id]; !ok {
+		return fmt.Errorf("check %s does not exist", id)
+	}
+	delete(s.checks, id)
+	return s.save()
+}
