@@ -17,16 +17,19 @@ func RunCheck(hc *HealthCheck, timeout time.Duration) {
 	hc.Duration = fmt.Sprintf("%dms", took.Milliseconds())
 
 	if err != nil {
+		zero := int32(0)
 		hc.Status = "Error"
-		hc.Code = 0
+		hc.Code = &zero
 		hc.Error = err.Error()
 		return
 	}
 
 	// close the body even if we don't read it, otherwise connections leak
 	resp.Body.Close()
+
+	code := int32(resp.StatusCode)
+	hc.Code = &code
 	hc.Status = http.StatusText(resp.StatusCode)
-	hc.Code = int32(resp.StatusCode)
 	hc.Error = "" // clear any previous error
 }
 
@@ -37,7 +40,9 @@ func RunAll(db *Store, timeout time.Duration) {
 		return
 	}
 
+	// buffered channel so goroutines don't block waiting to send
 	ch := make(chan HealthCheck, len(checks))
+
 	for _, c := range checks {
 		go func(hc HealthCheck) {
 			RunCheck(&hc, timeout)
@@ -45,8 +50,9 @@ func RunAll(db *Store, timeout time.Duration) {
 		}(c)
 	}
 
+	// collect all results and save them
 	for i := 0; i < len(checks); i++ {
 		done := <-ch
-		db.Update(&done)
+		db.Update(&done) //nolint: errcheck
 	}
 }
