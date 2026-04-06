@@ -22,8 +22,17 @@ func main() {
 		log.Fatalf("loading data: %v", err)
 	}
 
+	quit := make(chan struct{})
+	StartScheduler(db, interval, quit)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/health/checks", func(w http.ResponseWriter, r *http.Request) {
+		doList(db, w, r)
+	})
+
 	log.Printf("listening on %s", *addr)
-	err = http.ListenAndServe(*addr, nil)
+	err = http.ListenAndServe(*addr, mux)
+	close(quit)
 	if err != nil {
 		log.Fatal(err)
 	}
